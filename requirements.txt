@@ -1,0 +1,21 @@
+# Python Azure IoT SDK
+azure-iot-device>=2.12.0
+azure-iot-hub>=2.7.0
+
+# Azure Core
+azure-identity>=1.12.0
+azure-mgmt-iothub>=2.3.0
+
+# MQTT Client
+paho-mqtt>=1.6.1
+
+# Certificate Management
+cryptography>=41.0.0
+pyOpenSSL>=23.2.0
+
+# Environment Variables
+python-dotenv>=1.0.0
+
+# Utilities
+requests>=2.31.0
+colorama>=0.4.6

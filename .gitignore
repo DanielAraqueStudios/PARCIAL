@@ -1,0 +1,50 @@
+# Ignore Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Environment variables with secrets
+.env
+
+# Certificates and Private Keys (CRITICAL - NEVER COMMIT)
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+certs/
+
+# Azure credentials
+.azure/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Evidence screenshots (may contain sensitive info)
+evidencias/screenshots/
+evidencias/logs/
+
+# Temporary files
+*.tmp
+*.bak
