@@ -1,0 +1,599 @@
+% ============================================================================
+% SPRINT 2: DISEÑO E IMPLEMENTACIÓN DEL SISTEMA
+% Arquitectura, Componentes, Diagramas y Código
+% ============================================================================
+
+% Este archivo continúa desde sprint1_base.tex
+% Agregar después de la sección de Marco Teórico
+
+% ============================================================================
+% 3. DISEÑO DEL SISTEMA
+% ============================================================================
+\section{Diseño del Sistema}
+
+\subsection{Arquitectura General}
+
+El sistema implementado sigue una arquitectura de microservicios distribuidos con los siguientes componentes:
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=2cm,
+    block/.style={rectangle, draw, fill=azulumng!20, text width=3cm, text centered, rounded corners, minimum height=1cm},
+    device/.style={rectangle, draw, fill=verdecorrecto!20, text width=2.5cm, text centered, rounded corners, minimum height=0.8cm},
+    cloud/.style={rectangle, draw, fill=amarilloalerta!20, text width=3cm, text centered, rounded corners, minimum height=1cm},
+    storage/.style={cylinder, draw, fill=azulcodigo!20, shape border rotate=90, aspect=0.25, minimum height=1cm, minimum width=2cm},
+    arrow/.style={thick,->,>=stealth}
+]
+
+% Dispositivo IoT
+\node[device] (device) {BedSideMonitor\\BSM\_G101};
+
+% AWS IoT Core
+\node[cloud, right=of device] (iot) {AWS IoT Core\\MQTT Broker\\(8883)};
+
+% Kinesis
+\node[block, right=of iot] (kinesis) {Amazon Kinesis\\Data Streams\\(3 streams)};
+
+% Consumidores
+\node[block, below=of kinesis] (consumer1) {Consumer\\(Anomaly Detector)};
+\node[block, right=of consumer1] (consumer2) {Consumer\\(DynamoDB Writer)};
+
+% DynamoDB
+\node[storage, below=of consumer2] (dynamo) {DynamoDB\\BSM\_anamoly};
+
+% LocalStack Container
+\node[block, below=of device, yshift=-3cm] (localstack) {LocalStack\\Docker Container\\(Port 4566)};
+
+% Flechas
+\draw[arrow] (device) -- node[above] {X.509 TLS} (iot);
+\draw[arrow] (iot) -- node[above] {IoT Rule} (kinesis);
+\draw[arrow] (kinesis) -- (consumer1);
+\draw[arrow] (kinesis) -- (consumer2);
+\draw[arrow] (consumer2) -- (dynamo);
+\draw[arrow, dashed] (localstack) -- node[right] {Emula} (kinesis);
+\draw[arrow, dashed] (localstack) -- (dynamo);
+
+\end{tikzpicture}
+\caption{Arquitectura general del sistema IoT}
+\label{fig:arquitectura}
+\end{figure}
+
+\subsection{Componentes del Sistema}
+
+\subsubsection{BedSideMonitor.py - Publicador MQTT}
+
+Dispositivo simulado que genera y publica telemetría de signos vitales mediante MQTT sobre TLS con autenticación X.509.
+
+\textbf{Características}:
+\begin{itemize}
+    \item \textbf{Conexión segura}: MQTT v3.1.1 sobre TLS 1.2+ en puerto 8883
+    \item \textbf{Autenticación}: Certificados X.509 únicos por dispositivo
+    \item \textbf{Telemetría}: HeartRate, SpO2, Temperature con distribución gaussiana
+    \item \textbf{Payload JSON}: Formato estructurado con deviceid, timestamp, datatype, value
+    \item \textbf{CLI configurable}: Argumentos para endpoint, certificados, topic, modo
+\end{itemize}
+
+\textbf{Parámetros de línea de comandos}:
+\begin{lstlisting}[style=powershell, caption=Ejecución de BedSideMonitor.py]
+python BedSideMonitor.py `
+  -e <iot-endpoint>.iot.<region>.amazonaws.com `
+  -r root-CA.crt `
+  -c device-cert.pem `
+  -k private-key.pem `
+  -id BSM_G101 `
+  -t sdk/test/Python `
+  -m publish
+\end{lstlisting}
+
+\subsubsection{AWS IoT Core - Broker MQTT}
+
+Servicio administrado que actúa como broker MQTT con capacidades de enrutamiento.
+
+\textbf{Configuración}:
+\begin{itemize}
+    \item \textbf{Thing}: BSM\_G101 registrado con certificado X.509
+    \item \textbf{Policy}: Permisos para connect, publish, subscribe
+    \item \textbf{IoT Rule}: Enruta mensajes desde topic MQTT a Kinesis Stream
+\end{itemize}
+
+\textbf{Regla IoT (SQL)}:
+\begin{lstlisting}[language=SQL, caption=Regla IoT para enrutamiento a Kinesis]
+SELECT * FROM 'sdk/test/Python'
+\end{lstlisting}
+
+\textbf{Acción}: Enviar a Kinesis Data Stream \texttt{BSM\_Stream}
+
+\subsubsection{Amazon Kinesis Data Streams}
+
+Tres streams para procesamiento de telemetría en tiempo real:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|p{8cm}|}
+\hline
+\rowcolor{azulumng!20}
+\textbf{Stream} & \textbf{Propósito} \\
+\hline
+\texttt{BSMStream} & Stream principal para telemetría agregada \\
+\hline
+\texttt{BSM\_Stream} & Stream específico para BedSideMonitor con enrutamiento IoT Rule \\
+\hline
+\texttt{BSM\_Data\_Stream1} & Stream alternativo para testing y desarrollo \\
+\hline
+\end{tabular}
+\caption{Kinesis Data Streams configurados}
+\label{tab:streams}
+\end{table}
+
+\textbf{Configuración}:
+\begin{itemize}
+    \item \textbf{Shards}: 1 por stream (suficiente para desarrollo)
+    \item \textbf{Retention}: 24 horas (default)
+    \item \textbf{Partition Key}: deviceid para distribución
+\end{itemize}
+
+\subsubsection{Consumidores Kinesis}
+
+Dos consumidores Python que procesan datos del stream en tiempo real:
+
+\textbf{1. consumer\_and\_anomaly\_detector.py}
+\begin{itemize}
+    \item Lee desde \texttt{BSMStream}
+    \item Detecta anomalías con umbrales clínicos
+    \item Imprime alertas en consola
+    \item No persiste datos
+\end{itemize}
+
+\textbf{Umbrales de detección}:
+\begin{lstlisting}[style=python, caption=Algoritmo de detección de anomalías]
+def detect_anomaly(readings):
+    anomalies = []
+    
+    if readings['datatype'] == 'HeartRate':
+        if readings['value'] < 60 or readings['value'] > 100:
+            anomalies.append('Tachycardia/Bradycardia')
+    
+    elif readings['datatype'] == 'SPO2':
+        if readings['value'] < 85 or readings['value'] > 110:
+            anomalies.append('Hypoxemia')
+    
+    elif readings['datatype'] == 'Temperature':
+        if readings['value'] < 96 or readings['value'] > 101:
+            anomalies.append('Hypothermia/Fever')
+    
+    return anomalies
+\end{lstlisting}
+
+\textbf{2. consume\_and\_update.py}
+\begin{itemize}
+    \item Lee desde \texttt{BSM\_Stream}
+    \item Detecta anomalías (mismos umbrales)
+    \item Persiste anomalías en DynamoDB
+    \item Usa \texttt{Decimal} para precisión numérica
+\end{itemize}
+
+\subsubsection{DynamoDB - Base de Datos NoSQL}
+
+Tabla \texttt{BSM\_anamoly} para persistencia de eventos anómalos.
+
+\textbf{Esquema}:
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|l|p{6cm}|}
+\hline
+\rowcolor{azulumng!20}
+\textbf{Atributo} & \textbf{Tipo} & \textbf{Descripción} \\
+\hline
+deviceid & String (HASH) & Identificador del dispositivo (BSM\_G101) \\
+\hline
+timestamp & String (RANGE) & ISO 8601 timestamp del evento \\
+\hline
+datatype & String & Tipo de medición (HeartRate, SPO2, Temperature) \\
+\hline
+value & Number & Valor medido que generó la anomalía \\
+\hline
+\end{tabular}
+\caption{Esquema tabla BSM\_anamoly}
+\label{tab:dynamodb}
+\end{table}
+
+\textbf{Escritura en DynamoDB}:
+\begin{lstlisting}[style=python, caption=Persistencia de anomalías]
+import boto3
+from decimal import Decimal
+
+dynamodb = boto3.resource('dynamodb', 
+    endpoint_url='http://localhost:4566')
+table = dynamodb.Table('BSM_anamoly')
+
+# Convertir float a Decimal para DynamoDB
+readings_decimal = json.loads(
+    json.dumps(readings), 
+    parse_float=Decimal
+)
+
+table.put_item(Item=readings_decimal)
+\end{lstlisting}
+
+\subsubsection{LocalStack - Emulador AWS}
+
+Contenedor Docker que emula servicios AWS localmente.
+
+\textbf{Configuración docker-compose.yml}:
+\begin{lstlisting}[language=bash, caption=Docker Compose para LocalStack]
+version: '3.8'
+services:
+  localstack:
+    image: localstack/localstack:4.0.1
+    container_name: bedside-monitor-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=kinesis,dynamodb
+      - DEBUG=1
+      - PERSISTENCE=0
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      - "./localstack_init:/etc/localstack/init"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+\end{lstlisting}
+
+\textbf{Inicialización automática} (init\_localstack.py):
+\begin{itemize}
+    \item Crea 3 Kinesis Streams con 1 shard cada uno
+    \item Crea tabla DynamoDB \texttt{BSM\_anamoly} con claves HASH y RANGE
+    \item Verifica creación exitosa con listado de recursos
+\end{itemize}
+
+\subsection{Flujo de Datos}
+
+\subsubsection{Flujo Device-to-Cloud}
+
+\begin{enumerate}
+    \item \textbf{Generación}: BedSideMonitor genera telemetría cada 1-15 segundos
+    \begin{itemize}
+        \item HeartRate: $\mu=85$, $\sigma=12$ bpm (cada 1s)
+        \item SpO2: $\mu=90$, $\sigma=3$ \% (cada 10s)
+        \item Temperature: $\mu=99$, $\sigma=1.5$ °F (cada 15s)
+    \end{itemize}
+    
+    \item \textbf{Publicación MQTT}: Mensaje JSON publicado a AWS IoT Core
+    \begin{lstlisting}[language=json, caption=Payload MQTT]
+{
+  "deviceid": "BSM_G101",
+  "timestamp": "2025-11-16T12:30:45.123456",
+  "datatype": "HeartRate",
+  "value": 85.3
+}
+    \end{lstlisting}
+    
+    \item \textbf{Autenticación}: AWS IoT Core valida certificado X.509
+    
+    \item \textbf{Enrutamiento}: Regla IoT envía mensaje a Kinesis Stream
+    
+    \item \textbf{Consumo}: Consumidores leen desde Kinesis con shard iterator
+    
+    \item \textbf{Detección}: Algoritmo evalúa si valor está fuera de rango normal
+    
+    \item \textbf{Persistencia}: Si hay anomalía, se escribe en DynamoDB
+\end{enumerate}
+
+\subsubsection{Diagrama de Secuencia}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    >=stealth,
+    node distance=1.5cm,
+    actor/.style={rectangle, draw, minimum width=2cm, minimum height=0.8cm}
+]
+
+% Actores
+\node[actor] (device) at (0,0) {Device};
+\node[actor] (iot) at (3,0) {IoT Core};
+\node[actor] (kinesis) at (6,0) {Kinesis};
+\node[actor] (consumer) at (9,0) {Consumer};
+\node[actor] (dynamo) at (12,0) {DynamoDB};
+
+% Líneas de vida
+\draw[dashed] (device) -- ++(0,-8);
+\draw[dashed] (iot) -- ++(0,-8);
+\draw[dashed] (kinesis) -- ++(0,-8);
+\draw[dashed] (consumer) -- ++(0,-8);
+\draw[dashed] (dynamo) -- ++(0,-8);
+
+% Mensajes
+\draw[->] (0,-1) -- node[above] {\tiny connect()} (3,-1);
+\draw[<-] (0,-1.5) -- node[above] {\tiny ack} (3,-1.5);
+
+\draw[->] (0,-2.5) -- node[above] {\tiny publish(data)} (3,-2.5);
+\draw[->] (3,-3) -- node[above] {\tiny IoT Rule} (6,-3);
+\draw[->] (6,-3.5) -- node[above] {\tiny putRecord()} (6,-3.5);
+
+\draw[->] (9,-4.5) -- node[above] {\tiny getRecords()} (6,-4.5);
+\draw[<-] (9,-5) -- node[above] {\tiny records[]} (6,-5);
+
+\draw[->] (9,-6) -- node[above] {\tiny detect\_anomaly()} (9,-6);
+
+\draw[->] (9,-7) -- node[above] {\tiny putItem()} (12,-7);
+\draw[<-] (9,-7.5) -- node[above] {\tiny success} (12,-7.5);
+
+\end{tikzpicture}
+\caption{Diagrama de secuencia - Flujo de telemetría}
+\label{fig:secuencia}
+\end{figure}
+
+\newpage
+
+% ============================================================================
+% 4. IMPLEMENTACIÓN
+% ============================================================================
+\section{Implementación}
+
+\subsection{Configuración de AWS IoT Core}
+
+\subsubsection{Creación de Thing}
+
+\begin{lstlisting}[style=powershell, caption=Crear Thing en AWS IoT Core]
+# Crear Thing
+aws iot create-thing --thing-name BSM_G101
+
+# Crear certificado y clave
+aws iot create-keys-and-certificate `
+  --set-as-active `
+  --certificate-pem-outfile device-cert.pem `
+  --public-key-outfile public-key.pem `
+  --private-key-outfile private-key.pem
+
+# Adjuntar certificado al Thing
+aws iot attach-thing-principal `
+  --thing-name BSM_G101 `
+  --principal <certificate-arn>
+\end{lstlisting}
+
+\subsubsection{Política de Seguridad}
+
+\begin{lstlisting}[language=json, caption=Política IoT para BSM\_G101]
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "iot:Connect",
+      "Resource": "arn:aws:iot:region:account:client/BSM_G101"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "iot:Publish",
+      "Resource": "arn:aws:iot:region:account:topic/sdk/test/Python"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "iot:Subscribe",
+      "Resource": "arn:aws:iot:region:account:topicfilter/sdk/test/Python"
+    }
+  ]
+}
+\end{lstlisting}
+
+\subsection{Configuración de LocalStack}
+
+\subsubsection{Instalación y Despliegue}
+
+\begin{lstlisting}[style=powershell, caption=Iniciar LocalStack con Docker]
+# Clonar repositorio
+cd COMUNICACIONES-IOT-AWS
+
+# Iniciar LocalStack
+docker-compose up -d
+
+# Verificar estado
+docker ps
+
+# Verificar health
+curl http://localhost:4566/_localstack/health
+\end{lstlisting}
+
+\subsubsection{Inicialización de Recursos}
+
+\begin{lstlisting}[style=python, caption=Fragmento de init\_localstack.py]
+import boto3
+
+# Cliente Kinesis para LocalStack
+kinesis = boto3.client('kinesis',
+    endpoint_url='http://localhost:4566',
+    region_name='us-east-1',
+    aws_access_key_id='test',
+    aws_secret_access_key='test')
+
+# Crear streams
+streams = ['BSMStream', 'BSM_Stream', 'BSM_Data_Stream1']
+for stream_name in streams:
+    kinesis.create_stream(
+        StreamName=stream_name,
+        ShardCount=1
+    )
+    print(f"Created stream: {stream_name}")
+
+# Cliente DynamoDB
+dynamodb = boto3.resource('dynamodb',
+    endpoint_url='http://localhost:4566',
+    region_name='us-east-1',
+    aws_access_key_id='test',
+    aws_secret_access_key='test')
+
+# Crear tabla
+table = dynamodb.create_table(
+    TableName='BSM_anamoly',
+    KeySchema=[
+        {'AttributeName': 'deviceid', 'KeyType': 'HASH'},
+        {'AttributeName': 'timestamp', 'KeyType': 'RANGE'}
+    ],
+    AttributeDefinitions=[
+        {'AttributeName': 'deviceid', 'AttributeType': 'S'},
+        {'AttributeName': 'timestamp', 'AttributeType': 'S'}
+    ],
+    BillingMode='PAY_PER_REQUEST'
+)
+\end{lstlisting}
+
+\subsection{Publicador MQTT}
+
+\subsubsection{Fragmentos Clave de BedSideMonitor.py}
+
+\begin{lstlisting}[style=python, caption=Conexión MQTT con X.509]
+from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
+
+# Configurar cliente MQTT
+myAWSIoTMQTTClient = AWSIoTMQTTClient(clientId)
+myAWSIoTMQTTClient.configureEndpoint(host, port)
+myAWSIoTMQTTClient.configureCredentials(
+    rootCAPath, 
+    privateKeyPath, 
+    certificatePath
+)
+
+# Configurar parámetros
+myAWSIoTMQTTClient.configureAutoReconnectBackoffTime(1, 32, 20)
+myAWSIoTMQTTClient.configureOfflinePublishQueueing(-1)
+myAWSIoTMQTTClient.configureDrainingFrequency(2)
+myAWSIoTMQTTClient.configureConnectDisconnectTimeout(10)
+myAWSIoTMQTTClient.configureMQTTOperationTimeout(5)
+
+# Conectar
+myAWSIoTMQTTClient.connect()
+\end{lstlisting}
+
+\begin{lstlisting}[style=python, caption=Generación y publicación de telemetría]
+import datetime
+import json
+import random
+
+def publishBedSideMonitorData():
+    # Generar valores con distribución normal
+    heartRate = random.gauss(85, 12)
+    spo2 = random.gauss(90, 3)
+    temperature = random.gauss(99, 1.5)
+    
+    # Publicar HeartRate
+    message = {
+        'deviceid': 'BSM_G101',
+        'timestamp': str(datetime.datetime.now()),
+        'datatype': 'HeartRate',
+        'value': round(heartRate, 1)
+    }
+    myAWSIoTMQTTClient.publish(topic, json.dumps(message), 1)
+    
+    # Similar para SpO2 y Temperature con intervalos diferentes
+\end{lstlisting}
+
+\subsection{Consumidores Kinesis}
+
+\subsubsection{Lectura de Kinesis Stream}
+
+\begin{lstlisting}[style=python, caption=Patrón de consumo de Kinesis]
+import boto3
+import json
+import time
+
+# Cliente Kinesis
+client = boto3.client('kinesis',
+    endpoint_url='http://localhost:4566',
+    region_name='us-east-1')
+
+# Obtener shard iterator
+response = client.describe_stream(StreamName='BSM_Stream')
+shard_id = response['StreamDescription']['Shards'][0]['ShardId']
+
+shard_iterator = client.get_shard_iterator(
+    StreamName='BSM_Stream',
+    ShardId=shard_id,
+    ShardIteratorType='LATEST'
+)['ShardIterator']
+
+# Loop de consumo
+while True:
+    response = client.get_records(
+        ShardIterator=shard_iterator,
+        Limit=100
+    )
+    
+    # Procesar registros
+    for record in response['Records']:
+        data = json.loads(record['Data'])
+        process_telemetry(data)
+    
+    # Siguiente iteración
+    shard_iterator = response['NextShardIterator']
+    time.sleep(0.2)
+\end{lstlisting}
+
+\subsection{Configuración de Módulos Auxiliares}
+
+\subsubsection{localstack\_config.py}
+
+Módulo de configuración que permite alternar entre LocalStack y AWS real.
+
+\begin{lstlisting}[style=python, caption=Configuración de endpoints]
+import os
+import boto3
+
+def get_endpoint_url():
+    """Retorna endpoint URL basado en variable de entorno"""
+    if os.getenv('USE_LOCALSTACK', 'false').lower() == 'true':
+        return 'http://localhost:4566'
+    return None
+
+def get_kinesis_client():
+    """Retorna cliente Kinesis configurado"""
+    return boto3.client('kinesis',
+        endpoint_url=get_endpoint_url(),
+        region_name='us-east-1',
+        aws_access_key_id='test' if get_endpoint_url() else None,
+        aws_secret_access_key='test' if get_endpoint_url() else None
+    )
+
+def get_dynamodb_resource():
+    """Retorna recurso DynamoDB configurado"""
+    return boto3.resource('dynamodb',
+        endpoint_url=get_endpoint_url(),
+        region_name='us-east-1',
+        aws_access_key_id='test' if get_endpoint_url() else None,
+        aws_secret_access_key='test' if get_endpoint_url() else None
+    )
+\end{lstlisting}
+
+\subsection{Variables de Entorno}
+
+\begin{lstlisting}[language=bash, caption=Archivo .env]
+# LocalStack configuration
+USE_LOCALSTACK=true
+LOCALSTACK_ENDPOINT=http://localhost:4566
+
+# AWS configuration (when USE_LOCALSTACK=false)
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your_key
+AWS_SECRET_ACCESS_KEY=your_secret
+
+# IoT configuration
+IOT_ENDPOINT=xxxxxx.iot.us-east-1.amazonaws.com
+DEVICE_ID=BSM_G101
+CERT_PATH=certs/device-cert.pem
+KEY_PATH=certs/private-key.pem
+ROOT_CA_PATH=certs/root-CA.crt
+
+# Kinesis configuration
+KINESIS_STREAM_NAME=BSM_Stream
+
+# DynamoDB configuration
+DYNAMODB_TABLE_NAME=BSM_anamoly
+\end{lstlisting}
+
+\newpage
+
+% ============================================================================
+% FIN DEL SPRINT 2
+% ============================================================================
+
+\end{document}

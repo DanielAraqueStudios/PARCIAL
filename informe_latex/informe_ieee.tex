@@ -1,0 +1,414 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+
+% ============================================================================
+% PAQUETES ESENCIALES
+% ============================================================================
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows, positioning, fit, backgrounds}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+
+% ============================================================================
+% COLORES CORPORATIVOS
+% ============================================================================
+\definecolor{azulumng}{RGB}{0,51,102}
+\definecolor{azulclaro}{RGB}{41,128,185}
+\definecolor{grisumng}{RGB}{100,100,100}
+\definecolor{verdecorrecto}{RGB}{39,174,96}
+\definecolor{rojopeligro}{RGB}{231,76,60}
+\definecolor{naranjaadvertencia}{RGB}{230,126,34}
+
+% ============================================================================
+% CONFIGURACIÓN DE LISTINGS (CÓDIGO)
+% ============================================================================
+\lstdefinestyle{python}{
+    language=Python,
+    basicstyle=\ttfamily\scriptsize,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{gray}\itshape,
+    stringstyle=\color{red},
+    numberstyle=\tiny\color{gray},
+    numbers=left,
+    stepnumber=1,
+    numbersep=5pt,
+    backgroundcolor=\color{white},
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    frame=single,
+    rulecolor=\color{black},
+    tabsize=2,
+    captionpos=b,
+    breaklines=true,
+    breakatwhitespace=false,
+    escapeinside={\%*}{*)},
+    xleftmargin=10pt,
+    xrightmargin=10pt,
+}
+
+\lstdefinestyle{powershell}{
+    language=bash,
+    basicstyle=\ttfamily\scriptsize,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{gray}\itshape,
+    stringstyle=\color{red},
+    numberstyle=\tiny\color{gray},
+    numbers=left,
+    stepnumber=1,
+    numbersep=5pt,
+    backgroundcolor=\color{gray!5},
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    frame=single,
+    rulecolor=\color{black},
+    tabsize=2,
+    captionpos=b,
+    breaklines=true,
+    breakatwhitespace=false,
+    xleftmargin=10pt,
+    xrightmargin=10pt,
+}
+
+\lstdefinestyle{json}{
+    basicstyle=\ttfamily\scriptsize,
+    numberstyle=\tiny\color{gray},
+    numbers=left,
+    stepnumber=1,
+    numbersep=5pt,
+    showstringspaces=false,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{gray!5},
+    xleftmargin=10pt,
+    xrightmargin=10pt,
+}
+
+% ============================================================================
+% CONFIGURACIÓN DE HYPERREF
+% ============================================================================
+\hypersetup{
+    colorlinks=true,
+    linkcolor=azulumng,
+    filecolor=azulumng,
+    urlcolor=azulclaro,
+    citecolor=azulumng,
+    pdftitle={Sistema IoT con AWS IoT Core y LocalStack},
+    pdfauthor={Daniel Araque},
+    pdfsubject={Internet of Things, AWS, MQTT},
+    pdfkeywords={IoT, AWS IoT Core, MQTT, Kinesis, DynamoDB, LocalStack, X.509, TLS}
+}
+
+% ============================================================================
+% METADATOS DEL DOCUMENTO
+% ============================================================================
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+% ============================================================================
+% TÍTULO Y AUTORES
+% ============================================================================
+\title{Sistema IoT de Monitoreo de Signos Vitales con AWS IoT Core y LocalStack\\
+{\footnotesize \textsuperscript{*}Implementación de Arquitectura Cloud con Streaming en Tiempo Real}
+}
+
+\author{
+\IEEEauthorblockN{Daniel Araque}
+\IEEEauthorblockA{\textit{Programa de Ingeniería Mecatrónica} \\
+\textit{Universidad Militar Nueva Granada}\\
+Bogotá, Colombia \\
+daniel.araque@unimilitar.edu.co}
+}
+
+\maketitle
+
+% ============================================================================
+% ABSTRACT
+% ============================================================================
+\begin{abstract}
+Este documento presenta el diseño e implementación de un sistema IoT completo para monitoreo de signos vitales en tiempo real utilizando servicios de Amazon Web Services (AWS). El sistema integra AWS IoT Core como broker MQTT seguro con autenticación X.509, Amazon Kinesis Data Streams para procesamiento de telemetría en tiempo real, y Amazon DynamoDB para persistencia de anomalías detectadas. Se implementó LocalStack como emulador local de servicios AWS para facilitar desarrollo sin costos. El dispositivo simulado ``BedSide Monitor'' (BSM\_G101) publica mediciones de ritmo cardíaco, saturación de oxígeno (SpO2) y temperatura corporal cada 1-15 segundos sobre TLS 1.2+. Los resultados demuestran latencia end-to-end menor a 200ms, 100\% de tasa de entrega de mensajes, y detección exitosa de anomalías con 0\% de falsos negativos. La arquitectura propuesta es escalable, segura y adecuada para aplicaciones críticas de telemedicina e IoT en salud.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Internet of Things, AWS IoT Core, MQTT, X.509, TLS, Amazon Kinesis, DynamoDB, LocalStack, Telemetría, Monitoreo de Salud, Arquitectura Cloud
+\end{IEEEkeywords}
+
+% ============================================================================
+% SECCIÓN 1: INTRODUCCIÓN
+% ============================================================================
+\section{Introducción}
+
+\subsection{Contexto}
+
+El Internet de las Cosas (IoT) ha revolucionado múltiples industrias, siendo el sector de la salud uno de los más beneficiados. Los sistemas de monitoreo remoto de signos vitales permiten atención continua de pacientes, detección temprana de anomalías, y reducción de costos hospitalarios \cite{iot-healthcare}. La pandemia de COVID-19 aceleró la adopción de soluciones de telemedicina, evidenciando la necesidad de infraestructuras IoT robustas, escalables y seguras.
+
+Los servicios cloud de AWS proporcionan una plataforma madura para implementar sistemas IoT de nivel empresarial. AWS IoT Core ofrece un broker MQTT completamente administrado con capacidades de autenticación basada en certificados X.509, enrutamiento de mensajes mediante reglas SQL, y integración nativa con otros servicios AWS \cite{aws-iot-docs}. Esta integración permite construir pipelines de datos complejos sin gestionar infraestructura física.
+
+\subsection{Motivación}
+
+El desarrollo de aplicaciones IoT en cloud tradicionalmente implica costos significativos durante las fases de prototipado y testing, ya que cada mensaje, invocación de regla, y operación de base de datos genera cargos. LocalStack surge como solución a este problema, proporcionando un emulador de alta fidelidad (~90\%) de servicios AWS que ejecuta completamente en localhost \cite{localstack}.
+
+Este proyecto busca demostrar la viabilidad de desarrollar y probar sistemas IoT complejos localmente antes de desplegar en producción, reduciendo costos y acelerando iteraciones de desarrollo. El caso de uso elegido—monitoreo de signos vitales—es representativo de aplicaciones críticas donde latencia, confiabilidad y seguridad son primordiales.
+
+\subsection{Objetivos}
+
+\subsubsection{Objetivo General}
+Diseñar e implementar un sistema IoT end-to-end para monitoreo de signos vitales utilizando AWS IoT Core, Kinesis, DynamoDB y LocalStack, con énfasis en seguridad mediante certificados X.509 y procesamiento en tiempo real.
+
+\subsubsection{Objetivos Específicos}
+\begin{enumerate}
+    \item Configurar AWS IoT Core con autenticación X.509 y políticas de autorización granulares para dispositivos simulados.
+    \item Implementar publicador MQTT en Python que simule telemetría de BedSide Monitor con valores realistas de HeartRate, SpO2 y Temperature.
+    \item Desarrollar arquitectura de streaming con Amazon Kinesis para ingestión y procesamiento de datos en tiempo real.
+    \item Crear consumidores que detecten anomalías según umbrales clínicos y persistan alertas en DynamoDB.
+    \item Validar funcionamiento completo del sistema usando LocalStack como entorno de desarrollo local.
+    \item Medir métricas de rendimiento: latencia end-to-end, throughput, tasa de pérdida de mensajes.
+\end{enumerate}
+
+\subsection{Alcance}
+
+El proyecto abarca:
+\begin{itemize}
+    \item \textbf{Dispositivo}: Simulación software de BedSide Monitor (no hardware real).
+    \item \textbf{Conectividad}: MQTT sobre TLS 1.2+ con certificados X.509.
+    \item \textbf{Cloud}: AWS IoT Core, Kinesis Data Streams, DynamoDB.
+    \item \textbf{Desarrollo local}: LocalStack 4.0.1+ en Docker.
+    \item \textbf{Lenguaje}: Python 3.13 con AWSIoTPythonSDK y boto3.
+    \item \textbf{Detección de anomalías}: Algoritmo basado en umbrales (no machine learning).
+\end{itemize}
+
+No incluye: hardware embebido real, interfaz gráfica para visualización, integración con sistemas hospitalarios (HL7/FHIR), cumplimiento regulatorio (HIPAA/FDA).
+
+\subsection{Estructura del Documento}
+
+El resto del documento está organizado como sigue: la Sección II presenta el marco teórico sobre MQTT, TLS, X.509 y servicios AWS. La Sección III describe la arquitectura del sistema y componentes implementados. La Sección IV detalla la implementación con código y configuraciones. La Sección V documenta pruebas realizadas y metodología de validación. La Sección VI presenta resultados, métricas y evidencias. Finalmente, la Sección VII concluye con hallazgos, lecciones aprendidas y trabajo futuro.
+
+% ============================================================================
+% SECCIÓN 2: MARCO TEÓRICO
+% ============================================================================
+\section{Marco Teórico}
+
+\subsection{Protocolo MQTT}
+
+Message Queuing Telemetry Transport (MQTT) es un protocolo de mensajería publish/subscribe diseñado por IBM en 1999 para comunicaciones M2M (machine-to-machine) en redes con ancho de banda limitado y alta latencia \cite{mqtt-spec}. Su arquitectura ligera lo hace ideal para dispositivos IoT con recursos computacionales limitados.
+
+\subsubsection{Características Principales}
+\begin{itemize}
+    \item \textbf{Modelo Pub/Sub}: Desacoplamiento entre productores (publishers) y consumidores (subscribers) mediante broker central.
+    \item \textbf{Topics}: Jerarquía de canales tipo \texttt{sensor/temperature/room1}.
+    \item \textbf{QoS Levels}: Tres niveles de garantía de entrega:
+    \begin{itemize}
+        \item QoS 0 (At most once): Fire-and-forget, sin confirmación.
+        \item QoS 1 (At least once): Confirmación con posible duplicación.
+        \item QoS 2 (Exactly once): Handshake de 4 pasos, sin duplicados.
+    \end{itemize}
+    \item \textbf{Retained Messages}: Último mensaje publicado se almacena para nuevos suscriptores.
+    \item \textbf{Last Will and Testament (LWT)}: Mensaje automático cuando cliente se desconecta abruptamente.
+    \item \textbf{Keep-Alive}: Ping periódico para mantener conexión TCP activa.
+\end{itemize}
+
+\subsubsection{MQTT sobre TLS}
+El estándar MQTT no incluye cifrado nativo. En producción, MQTT se ejecuta sobre TLS (puerto 8883) para garantizar confidencialidad, integridad y autenticación. AWS IoT Core requiere TLS para todas las conexiones.
+
+\subsection{Transport Layer Security (TLS)}
+
+TLS es el protocolo criptográfico estándar para comunicaciones seguras en internet, sucesor de SSL \cite{tls-rfc}. Proporciona:
+
+\begin{itemize}
+    \item \textbf{Confidencialidad}: Cifrado simétrico (AES-256) de datos.
+    \item \textbf{Integridad}: MACs (Message Authentication Codes) previenen alteración.
+    \item \textbf{Autenticación}: Certificados X.509 verifican identidad de servidor (y opcionalmente cliente).
+\end{itemize}
+
+\subsubsection{Handshake TLS}
+El handshake TLS establece canal seguro mediante:
+\begin{enumerate}
+    \item Cliente envía ClientHello con cipher suites soportadas.
+    \item Servidor responde con ServerHello, certificado X.509, y clave pública.
+    \item Cliente verifica certificado contra CA raíz.
+    \item Cliente genera pre-master secret, lo cifra con clave pública del servidor, y lo envía.
+    \item Ambas partes derivan claves simétricas del pre-master secret.
+    \item Intercambian mensajes Finished cifrados para confirmar acuerdo.
+\end{enumerate}
+
+AWS IoT Core soporta TLS 1.2 y 1.3, con cipher suites recomendadas como \texttt{ECDHE-RSA-AES128-GCM-SHA256}.
+
+\subsection{Infraestructura de Clave Pública X.509}
+
+X.509 es el estándar internacional para certificados digitales \cite{x509-rfc}. Un certificado X.509 vincula una clave pública a una identidad (persona, dispositivo, servidor) mediante firma digital de una Autoridad Certificadora (CA).
+
+\subsubsection{Estructura de Certificado}
+Un certificado X.509 contiene:
+\begin{itemize}
+    \item \textbf{Subject}: Identidad del titular (Common Name, Organization).
+    \item \textbf{Issuer}: CA que firmó el certificado.
+    \item \textbf{Public Key}: Clave pública RSA/ECC del titular.
+    \item \textbf{Validity Period}: Fechas de inicio y expiración.
+    \item \textbf{Signature}: Firma digital del Issuer sobre el certificado.
+    \item \textbf{Extensions}: Uso de clave, Subject Alternative Names, etc.
+\end{itemize}
+
+\subsubsection{Cadena de Confianza}
+Un certificado de dispositivo IoT típicamente forma cadena:
+\[
+\text{Root CA} \rightarrow \text{Intermediate CA} \rightarrow \text{Device Certificate}
+\]
+
+El cliente debe confiar en el Root CA certificate para validar toda la cadena. AWS IoT Core actúa como CA para certificados de dispositivos.
+
+\subsection{AWS IoT Core}
+
+AWS IoT Core es un servicio completamente administrado que proporciona:
+
+\begin{itemize}
+    \item \textbf{Device Gateway}: Broker MQTT escalable (millones de dispositivos).
+    \item \textbf{Device Registry}: Gestión de identidades (Things, Certificates, Policies).
+    \item \textbf{Message Broker}: Enrutamiento pub/sub con soporte para MQTT, MQTT/WebSockets, HTTPS.
+    \item \textbf{Rules Engine}: Procesamiento serverless de mensajes con SQL y acciones (Kinesis, Lambda, SNS, etc.).
+    \item \textbf{Device Shadow}: Representación virtual persistente del estado del dispositivo.
+\end{itemize}
+
+\subsubsection{Modelo de Seguridad}
+AWS IoT Core usa autenticación mutual TLS (mTLS):
+\begin{enumerate}
+    \item Dispositivo presenta certificado X.509.
+    \item AWS IoT verifica certificado contra registro.
+    \item Si válido, evalúa políticas JSON asociadas al certificado.
+    \item Política define permisos (topics a los que puede publicar/suscribirse).
+\end{enumerate}
+
+Ejemplo de política IoT:
+\begin{lstlisting}[style=json]
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": ["iot:Connect"],
+    "Resource": ["arn:aws:iot:us-east-1:*:client/BSM_G101"]
+  }, {
+    "Effect": "Allow",
+    "Action": ["iot:Publish"],
+    "Resource": ["arn:aws:iot:us-east-1:*:topic/sdk/test/Python"]
+  }]
+}
+\end{lstlisting}
+
+\subsection{Amazon Kinesis Data Streams}
+
+Kinesis Data Streams es un servicio de ingestión y procesamiento de datos en tiempo real que puede capturar gigabytes de datos por segundo de miles de fuentes \cite{kinesis-docs}.
+
+\subsubsection{Conceptos Clave}
+\begin{itemize}
+    \item \textbf{Stream}: Secuencia ordenada de registros de datos.
+    \item \textbf{Shard}: Unidad de capacidad. Cada shard soporta:
+    \begin{itemize}
+        \item Escritura: 1 MB/s o 1000 registros/s
+        \item Lectura: 2 MB/s
+    \end{itemize}
+    \item \textbf{Partition Key}: Determina a qué shard se envía el registro (hash consistente).
+    \item \textbf{Sequence Number}: Identificador único auto-incremental por shard.
+    \item \textbf{Data Retention}: 24 horas por defecto, extendible a 365 días.
+\end{itemize}
+
+\subsubsection{Patrón de Consumo}
+Los consumidores leen de Kinesis mediante:
+\begin{enumerate}
+    \item Obtener \texttt{ShardIterator} especificando posición inicial (LATEST, TRIM\_HORIZON, AT\_SEQUENCE\_NUMBER).
+    \item Llamar \texttt{GetRecords()} con el iterator.
+    \item Procesar batch de registros (hasta 10 MB).
+    \item Usar \texttt{NextShardIterator} retornado para siguiente batch.
+\end{enumerate}
+
+Kinesis garantiza orden dentro de un shard, pero no entre shards.
+
+\subsection{Amazon DynamoDB}
+
+DynamoDB es una base de datos NoSQL serverless con latencias de milisegundos a cualquier escala \cite{dynamodb-docs}.
+
+\subsubsection{Modelo de Datos}
+\begin{itemize}
+    \item \textbf{Tabla}: Colección de items (filas).
+    \item \textbf{Item}: Colección de atributos (columnas). Cada item puede tener atributos diferentes.
+    \item \textbf{Primary Key}: Identifica únicamente cada item. Dos tipos:
+    \begin{itemize}
+        \item \textbf{Partition Key} (HASH): Distribuye items entre particiones.
+        \item \textbf{Partition Key + Sort Key} (HASH + RANGE): Permite queries dentro de una partition.
+    \end{itemize}
+    \item \textbf{Índices Secundarios}: Global Secondary Index (GSI), Local Secondary Index (LSI) para patrones de acceso alternativos.
+\end{itemize}
+
+\subsubsection{Tipos de Datos}
+DynamoDB soporta:
+\begin{itemize}
+    \item Escalares: String (S), Number (N), Binary (B), Boolean (BOOL), Null (NULL)
+    \item Conjuntos: String Set (SS), Number Set (NS), Binary Set (BS)
+    \item Documentos: List (L), Map (M)
+\end{itemize}
+
+Para este proyecto, la tabla \texttt{BSM\_anamoly} usa:
+\begin{itemize}
+    \item Partition Key: \texttt{deviceid} (String)
+    \item Sort Key: \texttt{timestamp} (String, ISO 8601)
+    \item Atributos: \texttt{datatype} (String), \texttt{value} (Number)
+\end{itemize}
+
+\subsection{LocalStack}
+
+LocalStack es un emulador cloud que simula servicios AWS localmente para desarrollo y testing sin conexión a internet ni costos \cite{localstack}.
+
+\subsubsection{Servicios Emulados}
+LocalStack soporta 80+ servicios AWS, incluyendo:
+\begin{itemize}
+    \item \textbf{Core}: S3, DynamoDB, Lambda, API Gateway, CloudFormation, SNS, SQS, Kinesis
+    \item \textbf{IoT}: AWS IoT Core (limitado), IoT Data
+    \item \textbf{Databases}: RDS, DocumentDB, ElastiCache
+    \item \textbf{Analytics}: Athena, Glue, Redshift
+\end{itemize}
+
+\subsubsection{Arquitectura}
+LocalStack ejecuta en contenedor Docker exponiendo:
+\begin{itemize}
+    \item Puerto 4566: Edge service (multiplexor para todos los servicios)
+    \item Puertos específicos opcionales (por servicio)
+\end{itemize}
+
+Clientes AWS SDK (boto3, AWS CLI) se configuran con \texttt{endpoint\_url=http://localhost:4566} para dirigir requests a LocalStack en lugar de AWS real.
+
+\subsubsection{Limitaciones}
+\begin{itemize}
+    \item Fidelidad ~90\%: Algunas APIs avanzadas no implementadas.
+    \item Performance: No refleja latencias reales de AWS (mucho más rápido localmente).
+    \item Persistencia: Por defecto efímera; requiere volúmenes Docker para persistir.
+    \item IoT Core: MQTT broker limitado; no soporta Device Shadow completo.
+\end{itemize}
+
+A pesar de limitaciones, LocalStack es altamente efectivo para desarrollo y CI/CD.
+
+% ============================================================================
+% INCLUSIÓN DE OTROS SPRINTS
+% ============================================================================
+
+% Sprint 2: Arquitectura e Implementación
+\input{sprint2_implementacion}
+
+% Sprint 3: Pruebas, Resultados y Conclusiones
+\input{sprint3_resultados}
+
+% ============================================================================
+% FIN DEL DOCUMENTO
+% ============================================================================
+
+\end{document}

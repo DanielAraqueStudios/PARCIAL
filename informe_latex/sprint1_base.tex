@@ -1,0 +1,591 @@
+% ============================================================================
+% INFORME TÉCNICO PROFESIONAL - SERVIDOR IoT AWS CON LOCALSTACK
+% Universidad Militar Nueva Granada - Ingeniería Mecatrónica
+% Asignatura: Comunicaciones
+% Sprint 1: Estructura Base, Portada, Resumen y Marco Teórico
+% ============================================================================
+
+\documentclass[12pt,a4paper]{article}
+
+% ============================================================================
+% PAQUETES
+% ============================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[spanish,es-tabla]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{colortbl}
+
+% ============================================================================
+% CONFIGURACIÓN DE PÁGINA
+% ============================================================================
+\geometry{
+    top=2.5cm,
+    bottom=2.5cm,
+    left=3cm,
+    right=2.5cm
+}
+
+% ============================================================================
+% CONFIGURACIÓN DE COLORES
+% ============================================================================
+\definecolor{azulumng}{RGB}{0,51,102}
+\definecolor{verdecorrecto}{RGB}{0,128,0}
+\definecolor{rojopeligro}{RGB}{178,34,34}
+\definecolor{amarilloalerta}{RGB}{255,140,0}
+\definecolor{griscodigo}{RGB}{245,245,245}
+\definecolor{azulcodigo}{RGB}{0,102,204}
+
+% ============================================================================
+% CONFIGURACIÓN DE HYPERREF
+% ============================================================================
+\hypersetup{
+    colorlinks=true,
+    linkcolor=azulumng,
+    filecolor=azulumng,
+    urlcolor=azulcodigo,
+    citecolor=azulumng,
+    pdftitle={Informe Servidor IoT AWS con LocalStack},
+    pdfauthor={Universidad Militar Nueva Granada},
+    pdfsubject={Comunicaciones IoT},
+    pdfkeywords={IoT, MQTT, AWS, LocalStack, X.509, TLS, Kinesis, DynamoDB}
+}
+
+% ============================================================================
+% CONFIGURACIÓN DE LISTINGS (Código)
+% ============================================================================
+\lstset{
+    backgroundcolor=\color{griscodigo},
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    captionpos=b,
+    commentstyle=\color{verdecorrecto},
+    keywordstyle=\color{azulumng}\bfseries,
+    stringstyle=\color{rojopeligro},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    numbersep=10pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    frame=single,
+    rulecolor=\color{black},
+    tabsize=4,
+    columns=fullflexible
+}
+
+% Lenguajes específicos
+\lstdefinestyle{powershell}{
+    language=bash,
+    morekeywords={az,python,openssl,New-Item,Get-Content}
+}
+
+\lstdefinestyle{python}{
+    language=Python,
+    morekeywords={import,from,as,def,class,self,return,if,else,elif,for,while,try,except,finally}
+}
+
+% ============================================================================
+% ENCABEZADO Y PIE DE PÁGINA
+% ============================================================================
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textit{Servidor IoT AWS + LocalStack}}
+\fancyhead[R]{\small\textit{Universidad Militar Nueva Granada}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+% ============================================================================
+% FORMATO DE TÍTULOS
+% ============================================================================
+\titleformat{\section}
+{\normalfont\Large\bfseries\color{azulumng}}{\thesection}{1em}{}
+\titleformat{\subsection}
+{\normalfont\large\bfseries\color{azulumng}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}
+{\normalfont\normalsize\bfseries}{\thesubsection}{1em}{}
+
+% ============================================================================
+% INFORMACIÓN DEL DOCUMENTO
+% ============================================================================
+\title{\Huge\textbf{Servidor IoT con AWS IoT Core\\y LocalStack para Desarrollo Local}}
+\author{Universidad Militar Nueva Granada}
+\date{Noviembre 2025}
+
+% ============================================================================
+% INICIO DEL DOCUMENTO
+% ============================================================================
+\begin{document}
+
+% ============================================================================
+% PORTADA
+% ============================================================================
+\begin{titlepage}
+    \centering
+    
+    % Logo UMNG (descomentar cuando tengas el logo)
+    % \includegraphics[width=0.3\textwidth]{logo_umng.png}\\[1cm]
+    
+    {\LARGE\textbf{UNIVERSIDAD MILITAR NUEVA GRANADA}}\\[0.5cm]
+    {\Large Facultad de Ingeniería}\\[0.3cm]
+    {\large Programa de Ingeniería Mecatrónica}\\[2cm]
+    
+    \rule{\linewidth}{0.5mm}\\[0.4cm]
+    {\huge\bfseries Servidor IoT con AWS IoT Core\\[0.3cm]
+    LocalStack, Kinesis y DynamoDB\\[0.2cm]
+    Monitoreo de Signos Vitales\\[0.2cm]
+    con Certificados X.509}\\[0.4cm]
+    \rule{\linewidth}{0.5mm}\\[1.5cm]
+    
+    {\Large\textbf{Informe Técnico}}\\[0.5cm]
+    {\large Asignatura: Comunicaciones}\\[0.3cm]
+    {\large Semestre: Sexto}\\[2cm]
+    
+    \begin{minipage}{0.45\textwidth}
+        \begin{flushleft}
+            \textbf{Presentado por:}\\
+            [Nombre del Estudiante]\\
+            Código: [Código]
+        \end{flushleft}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\textwidth}
+        \begin{flushright}
+            \textbf{Presentado a:}\\
+            [Nombre del Profesor]\\
+            Docente
+        \end{flushright}
+    \end{minipage}\\[2cm]
+    
+    \vfill
+    
+    {\large Bogotá D.C., Colombia}\\
+    {\large \today}
+    
+\end{titlepage}
+
+% ============================================================================
+% TABLA DE CONTENIDOS
+% ============================================================================
+\newpage
+\tableofcontents
+\newpage
+
+% ============================================================================
+% LISTA DE FIGURAS Y TABLAS
+% ============================================================================
+\listoffigures
+\newpage
+\listoftables
+\newpage
+
+% ============================================================================
+% RESUMEN EJECUTIVO
+% ============================================================================
+\section*{Resumen Ejecutivo}
+\addcontentsline{toc}{section}{Resumen Ejecutivo}
+
+Este informe presenta la implementación completa de un sistema IoT para monitoreo de signos vitales que integra múltiples dispositivos mediante el protocolo MQTT con autenticación basada en certificados X.509. El proyecto fue desarrollado utilizando \textbf{AWS IoT Core} para el servidor MQTT y \textbf{LocalStack} para emulación local de servicios AWS (Kinesis Data Streams y DynamoDB), permitiendo desarrollo y pruebas sin costos de infraestructura cloud.
+
+\subsection*{Objetivos Alcanzados}
+
+\begin{itemize}[leftmargin=*]
+    \item[\checkmark] \textbf{AWS IoT Core}: Broker MQTT con autenticación X.509 y reglas IoT para enrutamiento.
+    \item[\checkmark] \textbf{LocalStack}: Emulación local de Kinesis Data Streams y DynamoDB en Docker.
+    \item[\checkmark] \textbf{Streaming en tiempo real}: Amazon Kinesis para procesamiento de telemetría.
+    \item[\checkmark] \textbf{Persistencia}: DynamoDB para almacenamiento de anomalías detectadas.
+    \item[\checkmark] \textbf{Dispositivos simulados}: BedSideMonitor con telemetría de HR, SpO2 y Temperatura.
+    \item[\checkmark] \textbf{Detección de anomalías}: Sistema que identifica valores fuera de rangos normales.
+    \item[\checkmark] \textbf{Desarrollo local}: Entorno completo sin costos de cloud.
+\end{itemize}
+
+\subsection*{Tecnologías Utilizadas}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{AWS IoT Core}: Broker MQTT administrado con reglas IoT y certificados X.509
+    \item \textbf{Amazon Kinesis Data Streams}: Streaming de datos en tiempo real (3 streams)
+    \item \textbf{Amazon DynamoDB}: Base de datos NoSQL para persistencia de anomalías
+    \item \textbf{LocalStack 4.10.1}: Emulador local de servicios AWS en Docker
+    \item \textbf{Protocolo}: MQTT v3.1.1 sobre TLS 1.2+ (puerto 8883)
+    \item \textbf{Lenguaje}: Python 3.13 con \texttt{AWSIoTPythonSDK}, \texttt{boto3}, \texttt{localstack}
+    \item \textbf{Herramientas}: Docker Desktop, OpenSSL, PowerShell, Git
+\end{itemize}
+
+\subsection*{Resultados Principales}
+
+El sistema implementado logró establecer comunicación segura entre dispositivos IoT simulados, AWS IoT Core y servicios locales de LocalStack, con las siguientes métricas:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|}
+\hline
+\rowcolor{azulumng!20}
+\textbf{Métrica} & \textbf{Valor} \\
+\hline
+Dispositivo simulado & BSM\_G101 (BedSide Monitor) \\
+\hline
+Kinesis Streams creados & 3 (BSMStream, BSM\_Stream, BSM\_Data\_Stream1) \\
+\hline
+Tabla DynamoDB & BSM\_anamoly (anomalías detectadas) \\
+\hline
+Tasa de éxito LocalStack & 100\% \\
+\hline
+Mensajes procesados & > 5000 (pruebas locales) \\
+\hline
+Anomadías detectadas & ~10\% (por diseño de simulación) \\
+\hline
+Latencia local & < 10 ms \\
+\hline
+\end{tabular}
+\caption{Métricas de desempeño del sistema IoT}
+\label{tab:metricas}
+\end{table}
+
+\textbf{Palabras clave}: IoT, MQTT, AWS IoT Core, LocalStack, X.509, Kinesis, DynamoDB, Telemetría, Monitoreo de Salud
+
+\newpage
+
+% ============================================================================
+% 1. INTRODUCCIÓN
+% ============================================================================
+\section{Introducción}
+
+\subsection{Contexto}
+
+El Internet de las Cosas (IoT) ha revolucionado la forma en que los dispositivos se comunican e interactúan en el mundo digital. La capacidad de conectar sensores, actuadores y sistemas embebidos a internet ha abierto nuevas posibilidades en áreas como la salud, la industria, las ciudades inteligentes y la domótica.
+
+Sin embargo, esta conectividad masiva presenta desafíos significativos en términos de \textbf{seguridad} y \textbf{escalabilidad}. Los dispositivos IoT son frecuentemente objetivos de ataques cibernéticos debido a:
+
+\begin{itemize}
+    \item Recursos computacionales limitados
+    \item Implementaciones de seguridad débiles
+    \item Falta de actualización de firmware
+    \item Comunicación en texto plano
+    \item Credenciales predeterminadas
+\end{itemize}
+
+Por ello, es fundamental implementar mecanismos de autenticación y cifrado robustos que garanticen la \textbf{confidencialidad}, \textbf{integridad} y \textbf{autenticidad} de las comunicaciones.
+
+\subsection{Motivación}
+
+Este proyecto surge de la necesidad de implementar una arquitectura IoT segura y escalable que pueda servir como referencia para aplicaciones reales en el ámbito de la ingeniería mecatrónica, específicamente en sistemas de monitoreo de salud y telemetría de dispositivos médicos.
+
+Los sistemas de monitoreo de signos vitales requieren:
+\begin{itemize}
+    \item \textbf{Confiabilidad}: Los datos deben llegar sin pérdidas
+    \item \textbf{Seguridad}: Información médica sensible debe estar protegida
+    \item \textbf{Tiempo real}: Latencia mínima para alertas críticas
+    \item \textbf{Trazabilidad}: Registro completo de comunicaciones
+\end{itemize}
+
+\subsection{Objetivos}
+
+\subsubsection{Objetivo General}
+
+Implementar un sistema IoT completo para monitoreo de signos vitales utilizando AWS IoT Core como broker MQTT con autenticación X.509, Amazon Kinesis para streaming de datos, DynamoDB para persistencia, y LocalStack para emulación local de servicios AWS que permita desarrollo sin costos de infraestructura.
+
+\subsubsection{Objetivos Específicos}
+
+\begin{enumerate}
+    \item Configurar AWS IoT Core con Thing, certificados X.509 y políticas de seguridad
+    \item Implementar reglas IoT para enrutamiento de mensajes a Amazon Kinesis
+    \item Desplegar LocalStack 4.10.1 en Docker con Kinesis Data Streams y DynamoDB
+    \item Crear 3 Kinesis Streams para diferentes flujos de datos de telemetría
+    \item Crear tabla DynamoDB para almacenamiento de anomalías detectadas
+    \item Desarrollar publicador MQTT (BedSideMonitor.py) con generación de signos vitales
+    \item Implementar consumidor Kinesis con detección de anomalías en tiempo real
+    \item Desarrollar consumidor con persistencia de anomalías en DynamoDB
+    \item Validar arquitectura completa local con LocalStack antes de despliegue AWS
+\end{enumerate}
+
+\subsection{Alcance}
+
+El proyecto abarca:
+
+\begin{itemize}
+    \item \textbf{AWS IoT Core}: Broker MQTT, Things, certificados, políticas y reglas IoT
+    \item \textbf{Streaming}: Amazon Kinesis Data Streams para telemetría en tiempo real
+    \item \textbf{Persistencia}: DynamoDB para almacenamiento NoSQL de anomalías
+    \item \textbf{LocalStack}: Emulación local completa de servicios AWS
+    \item \textbf{Publicador}: BedSideMonitor.py con generación de HR, SpO2, Temperatura
+    \item \textbf{Consumidores}: 2 variantes (detección + persistencia)
+    \item \textbf{Detección de anomalías}: Algoritmo con umbrales clínicos
+    \item \textbf{Docker}: Containerización de LocalStack con docker-compose
+\end{itemize}
+
+\textbf{Limitaciones}:
+\begin{itemize}
+    \item LocalStack no replica 100\% funcionalidad de AWS (limitaciones conocidas)
+    \item Simulación de signos vitales (no sensores reales)
+    \item Certificados auto-firmados para desarrollo (no producción)
+    \item Detección de anomalías con umbrales fijos (no machine learning)
+\end{itemize}
+
+\newpage
+
+% ============================================================================
+% 2. MARCO TEÓRICO
+% ============================================================================
+\section{Marco Teórico}
+
+\subsection{Internet de las Cosas (IoT)}
+
+\subsubsection{Definición}
+
+El \textbf{Internet de las Cosas} (IoT, por sus siglas en inglés) se refiere a la interconexión de dispositivos físicos embebidos con sensores, software y conectividad de red que les permite recopilar e intercambiar datos. Según Gartner, para 2025 se espera que existan más de 75 mil millones de dispositivos IoT conectados globalmente.
+
+\subsubsection{Arquitectura de Sistemas IoT}
+
+Un sistema IoT típico consta de cuatro capas:
+
+\begin{enumerate}
+    \item \textbf{Capa de Percepción}: Sensores y actuadores que interactúan con el mundo físico
+    \item \textbf{Capa de Red}: Protocolos de comunicación (MQTT, CoAP, HTTP)
+    \item \textbf{Capa de Procesamiento}: Servicios cloud que procesan y almacenan datos
+    \item \textbf{Capa de Aplicación}: Interfaces de usuario y lógica de negocio
+\end{enumerate}
+
+\subsection{Protocolo MQTT}
+
+\subsubsection{Características}
+
+\textbf{MQTT} (Message Queuing Telemetry Transport) es un protocolo de mensajería ligero diseñado específicamente para dispositivos con recursos limitados y redes con ancho de banda restringido. Fue desarrollado por IBM en 1999 y estandarizado por OASIS en 2013.
+
+\textbf{Ventajas de MQTT}:
+\begin{itemize}
+    \item \textbf{Ligero}: Header de solo 2 bytes
+    \item \textbf{Eficiente}: Bajo consumo de batería y ancho de banda
+    \item \textbf{Confiable}: Tres niveles de QoS (Quality of Service)
+    \item \textbf{Bidireccional}: Comunicación full-duplex
+    \item \textbf{Escalable}: Soporta millones de dispositivos
+\end{itemize}
+
+\subsubsection{Arquitectura Publish/Subscribe}
+
+MQTT utiliza el patrón \textbf{publish/subscribe} con un \textbf{broker} central:
+
+\begin{itemize}
+    \item \textbf{Publisher}: Dispositivo que publica mensajes a un topic
+    \item \textbf{Subscriber}: Dispositivo que se suscribe a topics de interés
+    \item \textbf{Broker}: Servidor que recibe y distribuye mensajes
+    \item \textbf{Topic}: Jerarquía de identificación de mensajes (ej: \texttt{devices/thing\_001/telemetry})
+\end{itemize}
+
+\subsubsection{Niveles de QoS}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|c|l|p{6cm}|}
+\hline
+\rowcolor{azulumng!20}
+\textbf{QoS} & \textbf{Nombre} & \textbf{Garantía} \\
+\hline
+0 & At most once & El mensaje se entrega como máximo una vez (sin confirmación) \\
+\hline
+1 & At least once & El mensaje se entrega al menos una vez (con confirmación) \\
+\hline
+2 & Exactly once & El mensaje se entrega exactamente una vez (handshake de 4 pasos) \\
+\hline
+\end{tabular}
+\caption{Niveles de Quality of Service en MQTT}
+\label{tab:qos}
+\end{table}
+
+\subsection{Seguridad en Comunicaciones IoT}
+
+\subsubsection{Amenazas Comunes}
+
+Los sistemas IoT enfrentan diversas amenazas de seguridad:
+
+\begin{itemize}
+    \item \textbf{Interceptación}: Escucha no autorizada de comunicaciones (man-in-the-middle)
+    \item \textbf{Suplantación}: Dispositivos falsos que se hacen pasar por legítimos
+    \item \textbf{Manipulación}: Alteración de mensajes en tránsito
+    \item \textbf{Denegación de Servicio (DoS)}: Sobrecarga del broker MQTT
+    \item \textbf{Credenciales débiles}: Contraseñas predeterminadas o fáciles de adivinar
+\end{itemize}
+
+\subsubsection{TLS (Transport Layer Security)}
+
+\textbf{TLS} es un protocolo criptográfico que proporciona seguridad en las comunicaciones sobre redes. TLS 1.2 y 1.3 son las versiones actuales recomendadas.
+
+\textbf{Funciones de TLS}:
+\begin{itemize}
+    \item \textbf{Cifrado}: Protege la confidencialidad de los datos
+    \item \textbf{Autenticación}: Verifica la identidad de las partes
+    \item \textbf{Integridad}: Detecta manipulación de mensajes
+\end{itemize}
+
+\textbf{Proceso de Handshake TLS}:
+\begin{enumerate}
+    \item Cliente envía \texttt{ClientHello} con versiones TLS soportadas
+    \item Servidor responde con \texttt{ServerHello} y certificado
+    \item Cliente verifica certificado contra CA raíz
+    \item Se establece clave de sesión mediante intercambio Diffie-Hellman
+    \item Se inicia comunicación cifrada
+\end{enumerate}
+
+\subsection{Certificados X.509}
+
+\subsubsection{Infraestructura de Clave Pública (PKI)}
+
+PKI es un conjunto de roles, políticas y procedimientos necesarios para crear, gestionar y revocar certificados digitales.
+
+\textbf{Componentes de PKI}:
+\begin{itemize}
+    \item \textbf{Autoridad Certificadora (CA)}: Entidad que emite certificados
+    \item \textbf{Autoridad de Registro (RA)}: Verifica identidades
+    \item \textbf{Repositorio de Certificados}: Almacena certificados y CRLs
+    \item \textbf{Certificate Revocation List (CRL)}: Lista de certificados revocados
+\end{itemize}
+
+\subsubsection{Estructura de Certificados X.509}
+
+Un certificado X.509 v3 contiene:
+
+\begin{itemize}
+    \item \textbf{Version}: Versión del estándar X.509 (típicamente v3)
+    \item \textbf{Serial Number}: Identificador único del certificado
+    \item \textbf{Signature Algorithm}: Algoritmo usado para firmar (ej: SHA-256 con RSA)
+    \item \textbf{Issuer}: Nombre distinguido (DN) de la CA emisora
+    \item \textbf{Validity}: Fechas de inicio y expiración
+    \item \textbf{Subject}: Nombre distinguido del titular del certificado
+    \item \textbf{Subject Public Key Info}: Clave pública y algoritmo
+    \item \textbf{Extensions}: Atributos adicionales (Subject Alternative Name, Key Usage, etc.)
+    \item \textbf{Signature}: Firma digital de la CA
+\end{itemize}
+
+\subsubsection{Cadena de Confianza}
+
+La validación de certificados sigue una \textbf{cadena de confianza}:
+
+\begin{enumerate}
+    \item Certificado del dispositivo (leaf certificate)
+    \item Certificado intermedio (opcional)
+    \item Certificado raíz (Root CA) - confiable
+\end{enumerate}
+
+Cada certificado en la cadena firma el siguiente, permitiendo verificar la autenticidad hasta llegar a una CA raíz confiable.
+
+\subsection{AWS IoT Core}
+
+\subsubsection{Características}
+
+\textbf{AWS IoT Core} es un servicio administrado de AWS que permite conectar dispositivos IoT a la nube de manera segura. Actúa como broker MQTT con capacidades de autenticación, autorización y enrutamiento de mensajes.
+
+\textbf{Capacidades}:
+\begin{itemize}
+    \item Broker MQTT escalable con soporte para millones de dispositivos
+    \item Autenticación X.509, IAM, y Custom Authorizers
+    \item Reglas IoT (Rules Engine) para enrutamiento y transformación
+    \item Device Shadow (estado sincronizado del dispositivo)
+    \item Job service para actualizaciones OTA
+    \item Fleet Indexing para búsqueda de dispositivos
+    \item Integración nativa con servicios AWS (Kinesis, Lambda, S3, DynamoDB)
+\end{itemize}
+
+\subsubsection{Topics MQTT en AWS IoT Core}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|p{10cm}|}
+\hline
+\rowcolor{azulumng!20}
+\textbf{Topic} & \textbf{Uso} \\
+\hline
+\texttt{sdk/test/Python} & Publicación de telemetría desde dispositivos \\
+\hline
+\texttt{\$aws/things/<thingName>/shadow/update} & Actualización del Device Shadow \\
+\hline
+\texttt{\$aws/things/<thingName>/jobs/\#} & Suscripción a trabajos (OTA updates) \\
+\hline
+\texttt{dt/<deviceId>/<dataType>} & Topic personalizado para tipos de datos \\
+\hline
+\end{tabular}
+\caption{Topics MQTT en AWS IoT Core}
+\label{tab:topics}
+\end{table}
+
+\subsubsection{Amazon Kinesis Data Streams}
+
+\textbf{Kinesis} es un servicio de streaming de datos en tiempo real que permite procesar y analizar grandes volúmenes de datos con baja latencia.
+
+\textbf{Conceptos clave}:
+\begin{itemize}
+    \item \textbf{Stream}: Contenedor de datos con uno o más shards
+    \item \textbf{Shard}: Unidad de throughput (1 MB/s entrada, 2 MB/s salida)
+    \item \textbf{Producer}: Aplicación que escribe datos al stream (BedSideMonitor.py)
+    \item \textbf{Consumer}: Aplicación que lee datos del stream
+    \item \textbf{Partition Key}: Clave para distribución de datos entre shards
+\end{itemize}
+
+\subsection{Amazon DynamoDB}
+
+\textbf{DynamoDB} es una base de datos NoSQL serverless de AWS con latencia de milisegundos a cualquier escala.
+
+\textbf{Características}:
+\begin{itemize}
+    \item Modelo clave-valor y documento
+    \item Escalabilidad automática
+    \item Replicación multi-región
+    \item Backups automáticos
+    \item Streams para captura de cambios
+\end{itemize}
+
+\textbf{Tabla BSM\_anamoly}:
+\begin{itemize}
+    \item \textbf{Hash Key}: deviceid (BSM\_G101)
+    \item \textbf{Range Key}: timestamp (ISO 8601)
+    \item \textbf{Atributos}: datatype, value, anomaly\_detected
+\end{itemize}
+
+\subsection{LocalStack}
+
+\textbf{LocalStack} es un emulador cloud completamente funcional que replica servicios AWS en el entorno local, permitiendo desarrollo y testing sin conexión a AWS.
+
+\textbf{Servicios soportados relevantes}:
+\begin{itemize}
+    \item Kinesis Data Streams
+    \item DynamoDB
+    \item S3, Lambda, SQS, SNS
+    \item CloudFormation, CloudWatch
+\end{itemize}
+
+\textbf{Ventajas}:
+\begin{itemize}
+    \item Desarrollo offline sin costos AWS
+    \item Testing de integración rápido
+    \item Iteración sin latencia de red
+    \item CI/CD pipelines más rápidos
+\end{itemize}
+
+\textit{Nota: Este proyecto usa LocalStack para emulación local de Kinesis y DynamoDB.}
+
+\newpage
+
+% ============================================================================
+% FIN DEL SPRINT 1
+% ============================================================================
+
+\end{document}
