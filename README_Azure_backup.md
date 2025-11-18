@@ -1,327 +1,99 @@
-# Sistema IoT de Monitoreo de Signos Vitales - AWS IoT Core + LocalStack
+# Servidor IoT MQTT Seguro - Azure IoT Hub
 
-**Implementación completa de sistema IoT para monitoreo en tiempo real usando AWS IoT Core, Amazon Kinesis, DynamoDB y LocalStack para desarrollo local con autenticación X.509**
+**Implementación de servidor IoT con protocolo MQTT seguro usando Azure IoT Hub para dispositivos IoT con autenticación mediante certificados X.509**
 
-[![AWS](https://img.shields.io/badge/AWS-IoT%20Core-FF9900?logo=amazon-aws&logoColor=white)](https://aws.amazon.com/iot-core/)
-[![LocalStack](https://img.shields.io/badge/LocalStack-4.0+-00C7B7?logo=localstack&logoColor=white)](https://localstack.cloud/)
+[![Azure](https://img.shields.io/badge/Azure-IoT%20Hub-0078D4?logo=microsoft-azure&logoColor=white)](https://azure.microsoft.com/services/iot-hub/)
 [![MQTT](https://img.shields.io/badge/Protocol-MQTT-660066?logo=mqtt&logoColor=white)](https://mqtt.org/)
-[![Python](https://img.shields.io/badge/Python-3.13+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.7+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 
 ---
 
 ## 📋 Tabla de Contenidos
 
 - [Descripción del Proyecto](#-descripción-del-proyecto)
-- [Arquitectura del Sistema](#-arquitectura-del-sistema)
-- [Instalación Rápida](#-instalación-rápida)
-- [LocalStack para Desarrollo](#-localstack-para-desarrollo)
-- [Configuración AWS IoT Core](#-configuración-aws-iot-core)
-- [Uso del Sistema](#-uso-del-sistema)
-- [Pruebas y Resultados](#-pruebas-y-resultados)
-- [Documentación Completa](#-documentación-completa)
+- [Arquitectura](#-arquitectura)
+- [Requisitos Previos](#-requisitos-previos)
+- [Configuración Azure IoT Hub](#-configuración-azure-iot-hub)
+- [Generación de Certificados](#-generación-de-certificados)
+- [Creación de Dispositivos (Things)](#-creación-de-dispositivos-things)
+- [Implementación](#-implementación)
+- [Pruebas y Evidencias](#-pruebas-y-evidencias)
+- [Estructura del Proyecto](#-estructura-del-proyecto)
 
 ---
 
 ## 🎯 Descripción del Proyecto
 
-Este proyecto implementa un **sistema IoT completo end-to-end** para monitoreo de signos vitales en tiempo real que integra:
+Este proyecto implementa un **servidor IoT seguro** accesible desde internet que permite la integración de múltiples dispositivos IoT usando el protocolo **MQTT con autenticación basada en certificados X.509**.
 
-- **AWS IoT Core**: Broker MQTT seguro con autenticación X.509
-- **Amazon Kinesis Data Streams**: Procesamiento de telemetría en tiempo real
-- **Amazon DynamoDB**: Persistencia de anomalías detectadas
-- **LocalStack 4.0+**: Emulador AWS para desarrollo local sin costos
+### Objetivos
+✅ Desplegar un servicio IoT en la nube (Azure IoT Hub)  
+✅ Configurar acceso seguro mediante MQTT  
+✅ Crear múltiples "Things" (dispositivos) con certificados únicos  
+✅ Implementar comunicación bidireccional segura  
+✅ Generar evidencias de operación del servicio  
 
-### Caso de Uso: BedSide Monitor (BSM_G101)
+### Características
+- 🔒 **Autenticación segura** con certificados X.509
+- 🌐 **Acceso desde internet** mediante Azure IoT Hub
+- 📡 **Protocolo MQTT** (Puerto 8883 - TLS)
+- 🔑 **Certificados únicos** por dispositivo
+- 📊 **Monitoreo en tiempo real** de telemetría
+- ☁️ **Escalable** y tolerante a fallos
 
-Dispositivo simulado que publica mediciones cada 1-15 segundos:
-- ❤️ **HeartRate** (Ritmo cardíaco): 40-140 bpm
-- 🫁 **SpO2** (Saturación de oxígeno): 80-110%
-- 🌡️ **Temperature** (Temperatura corporal): 95-102°F
+---
 
-### Resultados Medidos
-- ⚡ **Latencia end-to-end**: 115ms promedio (62-197ms)
-- 📊 **Mensajes procesados**: 5,247 (100% sin pérdida)
-- 🎯 **Anomalías detectadas**: 541 (10.3%)
-- ✅ **Confiabilidad**: 0% pérdida, 100% tasa de éxito
-
-## 🏗️ Arquitectura del Sistema
+## 🏗️ Arquitectura
 
 ```
-┌─────────────────┐
-│  BedSide Monitor│  (Python Simulator)
-│    BSM_G101     │  Publica cada 1-15s
-└────────┬────────┘
-         │ MQTT/TLS:8883 + X.509
-         ▼
-┌─────────────────┐
-│  AWS IoT Core   │  Broker MQTT seguro
-│  Device Gateway │  Autenticación mTLS
-└────────┬────────┘
-         │ IoT Rules Engine
-         ▼
-┌─────────────────┐
-│ Amazon Kinesis  │  Streaming tiempo real
-│  Data Streams   │  BSMStream, BSM_Stream
-└────────┬────────┘
-         │ GetRecords()
-         ▼
-┌─────────────────┐
-│   Consumers     │  Python: Detector anomalías
-│  (Python Apps)  │  + Escritor DynamoDB
-└────────┬────────┘
-         │ PutItem()
-         ▼
-┌─────────────────┐
-│ Amazon DynamoDB │  NoSQL: BSM_anamoly
-│  Persistencia   │  HASH: deviceid + timestamp
-└─────────────────┘
-
-┌─────────────────┐
-│   LocalStack    │  🐳 Emulador AWS local
-│  localhost:4566 │  Para desarrollo sin costos
-└─────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    Azure Cloud                               │
+│                                                              │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │           Azure IoT Hub                             │    │
+│  │  - MQTT Endpoint (port 8883)                       │    │
+│  │  - Device Registry                                  │    │
+│  │  - X.509 Certificate Authentication                │    │
+│  │  - Message Routing                                  │    │
+│  └─────────────┬──────────────────────────────────────┘    │
+│                │                                             │
+│                ├─────────────────┬───────────────────┐      │
+│                ▼                 ▼                   ▼      │
+│       ┌────────────────┐ ┌────────────────┐ ┌──────────┐  │
+│       │ Azure Monitor  │ │ Event Hubs     │ │ Storage  │  │
+│       │ (Metrics/Logs) │ │ (Streaming)    │ │ Account  │  │
+│       └────────────────┘ └────────────────┘ └──────────┘  │
+│                                                              │
+└──────────────────────────┬───────────────────────────────────┘
+                           │ MQTT over TLS (8883)
+                           │
+        ┌──────────────────┼──────────────────┐
+        │                  │                  │
+        ▼                  ▼                  ▼
+┌───────────────┐  ┌───────────────┐  ┌───────────────┐
+│  Device #1    │  │  Device #2    │  │  Device #3    │
+│  (Thing_001)  │  │  (Thing_002)  │  │  (Thing_003)  │
+│               │  │               │  │               │
+│  - Cert X.509 │  │  - Cert X.509 │  │  - Cert X.509 │
+│  - Priv Key   │  │  - Priv Key   │  │  - Priv Key   │
+│  - Telemetry  │  │  - Telemetry  │  │  - Telemetry  │
+└───────────────┘  └───────────────┘  └───────────────┘
 ```
 
 ---
 
-## 🚀 Instalación Rápida
+## 🔧 Requisitos Previos
 
-### 1. Navegar al Proyecto Principal
+### Cuenta Azure
+- Cuenta Azure activa (cuenta educativa disponible)
+- Acceso al portal: https://portal.azure.com
+- Suscripción con créditos disponibles
 
-```powershell
-cd "C:\Users\danie\OneDrive - unimilitar.edu.co\Documentos\UNIVERSIDADDDDDDDDDDDDDDDDDDDDDDDDDD\MECATRÓNICA\SEXTO SEMESTRE\COMUNICACIONES\COMUNICACIONES-IOT-AWS"
-```
-
-### 2. Crear Entorno Virtual Python
-
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
-
-### 3. Iniciar LocalStack (Docker)
-
-```powershell
-docker run -d --name localstack -p 4566:4566 localstack/localstack:4.0.1
-```
-
-### 4. Inicializar Recursos
-
-```powershell
-$env:USE_LOCALSTACK="true"
-python init_localstack.py
-```
-
-**Esto crea**:
-- ✅ 3 Kinesis Streams
-- ✅ 1 Tabla DynamoDB (BSM_anamoly)
-
----
-
-## 🐳 LocalStack para Desarrollo
-
-### Ventajas
-
-| Aspecto | LocalStack | AWS Real |
-|---------|-----------|----------|
-| Costo | $0 | $1-5/millón msgs |
-| Latencia | <10ms | 80-150ms |
-| Internet | No requiere | Sí requiere |
-
-### Verificar Estado
-
-```powershell
-curl http://localhost:4566/_localstack/health
-```
-
----
-
-## ☁️ Configuración AWS IoT Core
-
-### Para Producción (AWS Real)
-
-#### 1. Crear Thing
-
-```bash
-aws iot create-thing --thing-name BSM_G101
-```
-
-#### 2. Crear Certificado
-
-```bash
-aws iot create-keys-and-certificate \
-  --set-as-active \
-  --certificate-pem-outfile BSM_G101-cert.pem \
-  --private-key-outfile BSM_G101-private.key
-```
-
-#### 3. Descargar Root CA
-
-```bash
-curl -o root-CA.crt https://www.amazontrust.com/repository/AmazonRootCA1.pem
-```
-
-#### 4. Crear Política IoT
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Action": "iot:Connect",
-    "Resource": "arn:aws:iot:us-east-1:*:client/BSM_G101"
-  }, {
-    "Effect": "Allow",
-    "Action": "iot:Publish",
-    "Resource": "arn:aws:iot:us-east-1:*:topic/sdk/test/Python"
-  }]
-}
-```
-
----
-
-## 💻 Uso del Sistema
-
-### Testing Local (LocalStack)
-
-**Terminal 1: Publicador**
-```powershell
-$env:USE_LOCALSTACK="true"
-python kinesis_publisher_local.py
-```
-
-**Terminal 2: Detector de Anomalías**
-```powershell
-$env:USE_LOCALSTACK="true"
-python consumer_and_anomaly_detector_local.py
-```
-
-**Output**:
-```
-⚠️  ANOMALY: HeartRate=120.4 (threshold: 60-100)
-✅ Normal: HR=75.3 bpm, SpO2=97.2%
-```
-
-**Terminal 3: Escritor DynamoDB**
-```powershell
-$env:USE_LOCALSTACK="true"
-python consume_and_update_local.py
-```
-
-### Producción (AWS Real)
-
-```powershell
-python BedSideMonitor.py \
-  -e YOUR-IOT-ENDPOINT.iot.us-east-1.amazonaws.com \
-  -r root-CA.crt \
-  -c BSM_G101-cert.pem \
-  -k BSM_G101-private.key \
-  -id BSM_G101 \
-  -t sdk/test/Python \
-  -m publish
-```
-
----
-
-## 🧪 Pruebas y Resultados
-
-### Suite de Pruebas (10 Casos)
-
-| ID | Caso | Resultado |
-|----|------|-----------|
-| TC-01 | Conexión MQTT + X.509 | ✅ PASS |
-| TC-02 | Publicación AWS IoT | ✅ PASS |
-| TC-03 | Enrutamiento Kinesis | ✅ PASS |
-| TC-04 | Consumo Kinesis | ✅ PASS |
-| TC-05 | Detección anomalía | ✅ PASS |
-| TC-06 | Escritura DynamoDB | ✅ PASS |
-| TC-07 | LocalStack health | ✅ PASS |
-| TC-08 | Auto-reconexión | ✅ PASS |
-| TC-09 | Cert inválido rechazado | ✅ PASS |
-| TC-10 | Throughput 100 msg/min | ✅ PASS |
-
-### Métricas Finales
-
-```
-Configuración:
-  Dispositivos:      1 (BSM_G101)
-  Kinesis Streams:   3
-  Tablas DynamoDB:   1
-
-Operación:
-  Mensajes enviados: 5,247
-  Tasa de éxito:     100%
-  Pérdida:           0%
-  Anomalías:         541 (10.3%)
-
-Rendimiento:
-  Latencia promedio: 115ms
-  Latencia máxima:   197ms
-  Throughput:        100 msg/min
-```
-
-### Distribución de Anomalías
-
-```
-HeartRate High:   178 (32.9%)
-HeartRate Low:    175 (32.3%)
-SpO2 Low:          89 (16.5%)
-Temperature High:  52 ( 9.6%)
-Temperature Low:   47 ( 8.7%)
-```
-
----
-
-## 📚 Documentación Completa
-
-### Informe Técnico IEEE
-
-📄 **Ubicación**: `informe_latex/informe_ieee.tex`
-
-**Contenido** (~15 páginas formato IEEE conference):
-- ✅ Abstract en inglés
-- ✅ Marco teórico (MQTT, TLS, X.509, AWS)
-- ✅ Arquitectura con diagramas TikZ
-- ✅ Implementación con código fuente
-- ✅ 10 casos de prueba documentados
-- ✅ Resultados y métricas completas
-- ✅ Conclusiones y trabajo futuro
-- ✅ 10 referencias bibliográficas
-
-**Compilar**:
-```powershell
-cd informe_latex
-pdflatex informe_ieee.tex
-pdflatex informe_ieee.tex
-```
-
-O usar **Overleaf**: https://overleaf.com
-
----
-
-## 👤 Autor
-
-**Daniel Araque**  
-Ingeniería Mecatrónica  
-Universidad Militar Nueva Granada  
-📧 daniel.araque@unimilitar.edu.co
-
----
-
-## 🔗 Enlaces Útiles
-
-- [AWS IoT Core Docs](https://docs.aws.amazon.com/iot/)
-- [MQTT v3.1.1 Spec](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/)
-- [LocalStack Docs](https://docs.localstack.cloud/)
-- [Amazon Kinesis Docs](https://docs.aws.amazon.com/kinesis/)
-- [Amazon DynamoDB Docs](https://docs.aws.amazon.com/dynamodb/)
-- [Repositorio GitHub](https://github.com/DanielAraqueStudios/COMUNICACIONES-IOT-AWS)
-
----
-
-**Versión**: 2.0 AWS + LocalStack  
-**Fecha**: Noviembre 17, 2025
+### Software Local
+- **Python 3.7+**
+- **Azure CLI** - https://docs.microsoft.com/cli/azure/install-azure-cli
+- **OpenSSL** - Para generación de certificados
+- **Git** - Para control de versiones
 
 ### Instalación de Azure CLI (Windows)
 
