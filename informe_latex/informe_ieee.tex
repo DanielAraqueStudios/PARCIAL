@@ -1,23 +1,22 @@
 \documentclass[conference]{IEEEtran}
 \IEEEoverridecommandlockouts
-% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
 
 % ============================================================================
 % PAQUETES ESENCIALES
 % ============================================================================
+\usepackage[T1]{fontenc}  % Soporte para caracteres acentuados
 \usepackage{cite}
 \usepackage{amsmath,amssymb,amsfonts}
 \usepackage{algorithmic}
 \usepackage{graphicx}
 \usepackage{textcomp}
 \usepackage{xcolor}
-\usepackage{hyperref}
+% hyperref se mueve al final del preámbulo
 \usepackage{listings}
 \usepackage{float}
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows, positioning, fit, backgrounds}
-\usepackage[utf8]{inputenc}
-\usepackage[spanish]{babel}
+% inputenc y babel removidos por compatibilidad IEEE
 
 % ============================================================================
 % COLORES CORPORATIVOS
@@ -96,18 +95,19 @@
 }
 
 % ============================================================================
-% CONFIGURACIÓN DE HYPERREF
+% HYPERREF - Al final del preámbulo
 % ============================================================================
+\usepackage{hyperref}
 \hypersetup{
     colorlinks=true,
-    linkcolor=azulumng,
-    filecolor=azulumng,
-    urlcolor=azulclaro,
-    citecolor=azulumng,
+    linkcolor=blue,
+    filecolor=blue,
+    urlcolor=blue,
+    citecolor=blue,
     pdftitle={Sistema IoT con AWS IoT Core y LocalStack},
     pdfauthor={Daniel Araque},
-    pdfsubject={Internet of Things, AWS, MQTT},
-    pdfkeywords={IoT, AWS IoT Core, MQTT, Kinesis, DynamoDB, LocalStack, X.509, TLS}
+    pdfsubject={Internet of Things AWS MQTT},
+    pdfkeywords={IoT AWS MQTT Kinesis DynamoDB LocalStack}
 }
 
 % ============================================================================
